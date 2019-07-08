@@ -1,9 +1,8 @@
 const express = require('express');
 const { check, validationResult } = require('express-validator');
 const router = express.Router();
-const mongo = require('mongodb').MongoClient;
-const objectId = require('mongodb').ObjectID;
-const assert = require('assert');
+const db = require('monk')('localhost:27017/test');
+const userData = db.get('user-data');
 
 const url = 'mongodb://localhost:27017/test';
 
@@ -12,40 +11,21 @@ router.get('/forms', (req, res, next) => {
     res.render('forms');
 });
 router.get('/get-data', (req, res, next) => {
-    const resultArray = [];
-
-    mongo.connect(url, (err, client) => {
-        assert.equal(null, err);
-
-        let db = client.db('test');
-        const cursor = db.collection('user-data').find();
-
-        cursor.forEach((doc, err) => {
-            assert.equal(null, err);
-            resultArray.push(doc)
-        }, () => {
-            client.close();
-            res.render('forms', {items: resultArray});
-        })
+    const data = userData.find({}).then(docs => {
+        res.render('forms', {items: docs})
     });
 });
 
 router.post('/insert', (req, res, next) => {
-    let item = {
+    const item = {
         title: req.body.title,
         content: req.body.content,
         author: req.body.author
     };
 
-    mongo.connect(url, (err, client) => {
-        assert.equal(null, err);
-        let db = client.db('test');
-        db.collection('user-data').insertOne(item, (err, result) => {
-            assert.equal(null, err);
-            console.log("inserted");
-            client.close();
-        });
-    });
+    userData.insert(item);
+
+    res.redirect('/forms')
 });
 router.post('/update', (req, res, next) => {
     let item = {
@@ -55,28 +35,12 @@ router.post('/update', (req, res, next) => {
     };
     let id = req.body.id;
 
-    mongo.connect(url, (err, client) => {
-        assert.equal(null, err);
-        let db = client.db('test');
-        db.collection('user-data').updateOne({'_id': objectId(id)}, {$set: item}, (err, result) => {
-            assert.equal(null, err);
-            console.log("Item updated");
-            client.close();
-        });
-    });
+    userData.update ({"_id": db.id(id)}, {$set: item});
 });
 router.post('/delete', (req, res, next) => {
     let id = req.body.id;
 
-    mongo.connect(url, (err, client) => {
-        assert.equal(null, err);
-        let db = client.db('test');
-        db.collection('user-data').deleteOne({'_id': objectId(id)}, (err, result) => {
-            assert.equal(null, err);
-            console.log("Item deleted");
-            client.close();
-        });
-    });
+    userData.remove({"_id": db.id(id)})
 });
 
 /* GET home page. */
